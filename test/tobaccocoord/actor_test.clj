@@ -1,0 +1,63 @@
+(ns tobaccocoord.actor-test
+  (:require [clojure.test :refer [deftest is testing]]
+            [tobaccocoord.actor :as actor]
+            [tobaccocoord.store :as store]))
+
+(defn- fresh-store []
+  (let [st (store/mem-store)]
+    (store/register-preparer! st {:preparer-id "preparer-1" :name "Kobo Yamada"})
+    (store/register-facility! st {:facility-id "F-1" :name "Kobo Tobacco Works" :max-supply-cost 2000})
+    st))
+
+(deftest commits-a-registered-work-log
+  (let [st (fresh-store)
+        graph (actor/build-graph {:store st})
+        request {:preparer-id "preparer-1" :op :log-work-record :stake :low
+                  :facility-id "F-1" :task "batch progress log"}
+        result (actor/run-request! graph request {} "thread-1")]
+    (is (= :done (:status result)))
+    (is (some? (get-in result [:state :record])))
+    (is (= 1 (count (store/records-of st "preparer-1"))))))
+
+(deftest holds-an-unregistered-facility-proposal
+  (let [st (fresh-store)
+        graph (actor/build-graph {:store st})
+        request {:preparer-id "preparer-1" :op :log-work-record :stake :low
+                  :facility-id "F-ghost" :task "batch progress log"}
+        result (actor/run-request! graph request {} "thread-2")]
+    (is (= :hold (:disposition (:state result))))
+    (is (empty? (store/records-of st "preparer-1")))))
+
+(deftest interrupts-then-approves-compliance-concern-on-human-approval
+  (let [st (fresh-store)
+        graph (actor/build-graph {:store st})
+        request {:preparer-id "preparer-1" :op :flag-compliance-concern :stake :low
+                  :facility-id "F-1" :hazard-type :dust-exposure-risk}
+        interrupted (actor/run-request! graph request {} "thread-3")]
+    (is (= :interrupted (:status interrupted)))
+    (is (empty? (store/records-of st "preparer-1")))
+    (let [resumed (actor/approve! graph "thread-3")]
+      (is (= :done (:status resumed)))
+      (is (= 1 (count (store/records-of st "preparer-1")))))))
+
+(deftest holds-a-scope-excluded-manufacturing-op-even-at-high-confidence
+  (testing "an actor run can never commit a proposal that would finalize a manufacturing-execution decision, regardless of disposition path"
+    (let [st (fresh-store)
+          graph (actor/build-graph {:store st})
+          request {:preparer-id "preparer-1" :op :finalize-manufacturing-decision :stake :low
+                    :facility-id "F-1" :task "production decision"}
+          result (actor/run-request! graph request {} "thread-4")]
+      (is (= :done (:status result)))
+      (is (= :hold (:disposition (:state result))))
+      (is (empty? (store/records-of st "preparer-1"))))))
+
+(deftest holds-a-scope-excluded-tax-stamp-op-even-at-high-confidence
+  (testing "an actor run can never commit a proposal that would finalize a regulatory-compliance-clearance decision, regardless of disposition path"
+    (let [st (fresh-store)
+          graph (actor/build-graph {:store st})
+          request {:preparer-id "preparer-1" :op :affix-tax-stamp :stake :low
+                    :facility-id "F-1" :task "tax stamp decision"}
+          result (actor/run-request! graph request {} "thread-5")]
+      (is (= :done (:status result)))
+      (is (= :hold (:disposition (:state result))))
+      (is (empty? (store/records-of st "preparer-1"))))))
