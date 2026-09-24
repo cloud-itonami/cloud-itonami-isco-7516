@@ -1,0 +1,45 @@
+;; What this vertical's robot physically does, declared for
+;; kotoba.robotics.process (kotoba-lang/robotics). `kbb -M:physics` runs it.
+;;
+;; README "Robotics premise": a factory-floor scheduling/logistics
+;; coordination robot handles crew scheduling, batch/inventory records and
+;; tobacco-materials supply orders for a tobacco preparation and tobacco-
+;; products crew (ISCO 7516). Its physical work: moving leaf bales from the
+;; store to the conditioning line, bringing a bale up to conditioning
+;; temperature, and palletising cases of finished product.
+;;
+;; Every number without a cited source is marked `estimate` in its :basis.
+;; Replacing an estimate with a sourced value is this bot's growth work.
+{:physics/schema "itonami.physical-ai.spec.v1"
+ :repo "cloud-itonami/cloud-itonami-isco-7516"
+ :cases
+ [{:id :leaf-bales-to-conditioning
+   :kind :transport
+   :procedure "AGV moves leaf bales from the bale store to the conditioning line infeed"
+   :params {:mass-kg 200.0 :distance-m 60.0 :v-max-mps 1.2 :a-max-mps2 0.4
+            :brake-decel-mps2 0.6 :drive-force-n 600.0 :crr 0.012
+            :cog-height-m 0.30 :support-half-length-m 0.45 :payload-cog-height-m 0.60
+            :max-time-s 1800.0}
+   :sweep {:param :payload-kg :values [100.0 200.0 400.0 800.0 1200.0]}
+   :quantity :cycle-time-s
+   :limit {:max 70.0 :basis "estimate: one store-to-infeed leg to keep the conditioning line fed"}
+   :boundary {:lo 50.0 :hi 5000.0}}
+  {:id :bale-conditioning-core
+   :kind :thermal
+   :procedure "a compressed leaf bale in the 60 C conditioning chamber until its core (insulated symmetry plane) reaches 50 C; steam penetration and moisture are not modelled"
+   :params {:thickness-m 0.15 :conductivity-w-mk 0.08 :density-kg-m3 300.0 :specific-heat-j-kgk 1500.0
+            :t0-c 18.0 :t-hot-c 60.0 :h-front-w-m2k 15.0 :h-back-w-m2k 0.0 :t-back-ambient-c 60.0
+            :threshold-c 50.0 :duration-s 259200.0 :nodes 11}
+   :sweep {:param :thickness-m :values [0.05 0.08 0.10 0.15 0.20]}
+   :quantity :time-to-threshold-s
+   :limit {:max 43200.0 :basis "estimate: a 12-hour dry-heat conditioning slot; real lines condition with vacuum/steam, which this conduction model does not capture"}
+   :boundary {:lo 0.02 :hi 0.3}}
+  {:id :case-onto-pallet
+   :kind :manipulator
+   :procedure "palletising arm lifts a shipping case of finished product from the conveyor onto the pallet"
+   :params {:l1-m 0.60 :l2-m 0.50 :m1-kg 8.0 :m2-kg 6.0
+            :from [0.50 0.40] :to [0.90 0.10] :duration-s 2.0 :steps 500}
+   :sweep {:param :payload-kg :values [3.0 6.0 10.0 15.0 20.0]}
+   :quantity :peak-tau1-nm
+   :limit {:max 150.0 :basis "estimate: continuous shoulder torque of a 10 kg-payload class arm at ~1.1 m reach"}
+   :boundary {:lo 0.5 :hi 60.0}}]}
