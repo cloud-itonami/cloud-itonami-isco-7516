@@ -1,5 +1,5 @@
 (ns tobaccocoord.governor-test
-  (:require [clojure.test :refer [deftest is testing]]
+  (:require [kotoba.test :refer [deftest is testing]]
             [tobaccocoord.store :as store]
             [tobaccocoord.advisor :as advisor]
             [tobaccocoord.governor :as governor]))
