@@ -2,7 +2,7 @@
   "TobaccoCoordActor — the ISCO-08 7516 tobacco preparation and
   tobacco-products manufacturing factory-floor scheduling/logistics
   coordination actor as a `langgraph.graph/state-graph` (ADR-2607121000
-  / CLAUDE.md Actors section). One graph run = one factory-floor
+  / AGENTS.md Actors section). One graph run = one factory-floor
   coordination operation request (intake -> advise -> govern -> decide
   -> commit/hold, with a human-approval interrupt for escalated
   proposals). No infinite internal loop; checkpointed per superstep so
